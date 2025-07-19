@@ -2,16 +2,12 @@ package com.databoss.aag
 
 import android.os.Bundle
 import android.util.Log
-import android.view.MenuItem
-import android.widget.Button
 import android.widget.ImageButton
-import android.widget.Toast
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.databoss.aag.fragments.HomeFragment
-import com.databoss.aag.fragments.MessageFragment
+import com.databoss.aag.fragments.VADFragment
 import com.databoss.aag.fragments.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
@@ -29,7 +25,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         val homeFragment = HomeFragment()
-        val messageFragment = MessageFragment()
+        val VADFragment = VADFragment()
         val profileFragment = ProfileFragment()
 
         setCurrentFragment(homeFragment)
@@ -38,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         bottomNavigationView.setOnItemSelectedListener {
             when (it.itemId) {
                 R.id.miHome -> setCurrentFragment(homeFragment)
-                R.id.miMessages -> setCurrentFragment(messageFragment)
+                R.id.miVAD -> setCurrentFragment(VADFragment)
                 R.id.miProfile -> setCurrentFragment(profileFragment)
             }
             true // lambda returns last line of the function
@@ -53,21 +49,34 @@ class MainActivity : AppCompatActivity() {
         // hook toggle button to drawer
         btnDrawerToggle.setOnClickListener {
             Log.d("MainActivity", "Toggle button clicked")
-            if (drawerLayout.isDrawerOpen(navView)) {
-                drawerLayout.closeDrawer(navView)
-            } else {
-                drawerLayout.openDrawer(navView)
-            }
+//            if (drawerLayout.isDrawerOpen(navView)) {
+//                drawerLayout.closeDrawer(navView)
+//            } else {
+//                drawerLayout.openDrawer(navView)
+//            }
+            drawerLayout.openDrawer(navView)
         }
 
         navView.setNavigationItemSelectedListener {
             when (it.itemId) {
-                R.id.miItem1 -> Toast.makeText(applicationContext,
-                    "Clicked Item 1", Toast.LENGTH_SHORT).show()
-                R.id.miItem2 -> Toast.makeText(applicationContext,
-                    "Clicked Item 2", Toast.LENGTH_SHORT).show()
-                R.id.miItem3 -> Toast.makeText(applicationContext,
-                    "Clicked Item 3", Toast.LENGTH_SHORT).show()
+//                R.id.miItem1 -> Toast.makeText(applicationContext,
+//                    "Clicked Item 1", Toast.LENGTH_SHORT).show()
+//                R.id.miItem2 -> Toast.makeText(applicationContext,
+//                    "Clicked Item 2", Toast.LENGTH_SHORT).show()
+//                R.id.miItem3 -> Toast.makeText(applicationContext,
+//                    "Clicked Item 3", Toast.LENGTH_SHORT).show()
+                R.id.miItem1 -> {
+                    setCurrentFragment(homeFragment)
+                    bottomNavigationView.selectedItemId = R.id.miHome
+                }
+                R.id.miItem2 -> {
+                    setCurrentFragment(VADFragment)
+                    bottomNavigationView.selectedItemId = R.id.miVAD
+                }
+                R.id.miItem3 -> {
+                    setCurrentFragment(profileFragment)
+                    bottomNavigationView.selectedItemId = R.id.miProfile
+                }
             }
             drawerLayout.closeDrawer(navView) // close after selection
             true

@@ -7,13 +7,12 @@
         android:icon="@drawable/ic_home" />
 
     <item
-        android:id="@+id/miMessages"
-        android:title="Messages"
-        android:icon="@drawable/ic_messages" />
+        android:id="@+id/miVAD"
+        android:title="VAD"
+        android:icon="@drawable/voice_chat_24px" />
 
     <item
         android:id="@+id/miProfile"
         android:title="Profile"
         android:icon="@drawable/ic_profile" />
-
 </menu>
