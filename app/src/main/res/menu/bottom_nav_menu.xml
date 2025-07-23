@@ -12,7 +12,7 @@
         android:icon="@drawable/voice_chat_24px" />
 
     <item
-        android:id="@+id/miProfile"
-        android:title="Profile"
-        android:icon="@drawable/ic_profile" />
+        android:id="@+id/miTest"
+        android:title="Test"
+        android:icon="@drawable/build_circle_24px" />
 </menu>

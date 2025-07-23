@@ -8,7 +8,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.databoss.aag.fragments.HomeFragment
 import com.databoss.aag.fragments.VADFragment
-import com.databoss.aag.fragments.ProfileFragment
+import com.databoss.aag.fragments.TestFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
 
@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
 
         val homeFragment = HomeFragment()
         val VADFragment = VADFragment()
-        val profileFragment = ProfileFragment()
+        val testFragment = TestFragment()
 
         setCurrentFragment(homeFragment)
 
@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
             when (it.itemId) {
                 R.id.miHome -> setCurrentFragment(homeFragment)
                 R.id.miVAD -> setCurrentFragment(VADFragment)
-                R.id.miProfile -> setCurrentFragment(profileFragment)
+                R.id.miTest -> setCurrentFragment(testFragment)
             }
             true // lambda returns last line of the function
         }
@@ -74,8 +74,8 @@ class MainActivity : AppCompatActivity() {
                     bottomNavigationView.selectedItemId = R.id.miVAD
                 }
                 R.id.miItem3 -> {
-                    setCurrentFragment(profileFragment)
-                    bottomNavigationView.selectedItemId = R.id.miProfile
+                    setCurrentFragment(testFragment)
+                    bottomNavigationView.selectedItemId = R.id.miTest
                 }
             }
             drawerLayout.closeDrawer(navView) // close after selection
