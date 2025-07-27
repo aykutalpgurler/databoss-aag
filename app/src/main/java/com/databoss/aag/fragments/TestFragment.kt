@@ -16,7 +16,7 @@ class TestFragment : Fragment(R.layout.fragment_test) {
         val testButton = view.findViewById<Button>(R.id.testButton)
 
         testButton.setOnClickListener {
-            WebRTCTest(requireContext(), "harvard.wav").runTest()
+            WebRTCTest(requireContext(), "silence.wav").runTest()
         }
     }
 }

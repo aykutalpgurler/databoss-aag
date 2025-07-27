@@ -46,6 +46,7 @@ kotlin {
 
 dependencies {
 
+    implementation("com.github.gkonovalov.android-vad:silero:2.0.10")
     implementation("com.github.gkonovalov.android-vad:webrtc:2.0.10")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
