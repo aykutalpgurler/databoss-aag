@@ -2,14 +2,16 @@ package com.databoss.aag.fragments
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.res.Resources
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
+ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
@@ -27,6 +29,7 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.random.Random
 
 class VADFragment : Fragment(R.layout.fragment_vad) {
 
@@ -36,7 +39,7 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
     // config for webrtc-vad
     private val sampleRate = SampleRate.SAMPLE_RATE_16K
     private val frameSize = FrameSize.FRAME_SIZE_320
-    private val mode = Mode.VERY_AGGRESSIVE
+    private val mode = Mode.NORMAL
     private val silenceDurationMs = 300
     private val speechDurationMs = 50
 
@@ -49,10 +52,12 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
 
     // resources
     private lateinit var audioRecord: AudioRecord
+    private lateinit var vad: VadWebRTC
 
     // mediarecord
     private var mediaRecorder: MediaRecorder? = null
     private var outputFile: String? = null
+
 
 
 
@@ -72,45 +77,49 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
             }
 
             if (isMicToggled) {
+                micIcon.setImageResource(R.drawable.mic_24px)
                 Log.d(TAG, "Listening started")
                 listenAudioRecord()
 
             } else {
+                micIcon.setImageResource(R.drawable.mic_off_24px)
                 Log.d(TAG, "Listening stopped")
                 stopAudioRecord()
             }
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.S)
-    private fun listenMediaRecorder() {
-        val outputDir = File(context?.getExternalFilesDir(null), "MediaRecord")
-        if (!outputDir.exists()) outputDir.mkdirs()
-        outputFile = File(outputDir, "audio_${System.currentTimeMillis()}.mp3").absolutePath
-
-
-        mediaRecorder = MediaRecorder(requireContext()).apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile(outputFile)
-
-            prepare()
-            start()
-        }
-    }
-
-    private fun stopMediaRecorder() {
-        mediaRecorder?.apply {
-            stop()
-            release()
-            Log.i(TAG, "Audio saved at: $outputFile")
-        }
-        mediaRecorder = null
-    }
+//    @RequiresApi(Build.VERSION_CODES.S)
+//    private fun listenMediaRecorder() {
+//        val outputDir = File(context?.getExternalFilesDir(null), "MediaRecord")
+//        if (!outputDir.exists()) outputDir.mkdirs()
+//        outputFile = File(outputDir, "audio_${System.currentTimeMillis()}.mp3").absolutePath
+//
+//
+//        mediaRecorder = MediaRecorder(requireContext()).apply {
+//            setAudioSource(MediaRecorder.AudioSource.MIC)
+//            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+//            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+//            setOutputFile(outputFile)
+//
+//            prepare()
+//            start()
+//        }
+//    }
+//
+//    private fun stopMediaRecorder() {
+//        mediaRecorder?.apply {
+//            stop()
+//            release()
+//            Log.i(TAG, "Audio saved at: $outputFile")
+//        }
+//        mediaRecorder = null
+//    }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun listenAudioRecord() {
+
+//        val textView : TextView? = view?.findViewById<TextView>(R.id.audioLogTextView)
 
         audioRecord = AudioRecord(
             audioSource,
@@ -120,14 +129,61 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
             bufferSizeInBytes
         )
 
-        audioRecord.startRecording()
+        vad = VadWebRTC(
+            sampleRate = sampleRate,
+            frameSize = frameSize,
+            mode = mode,
+            silenceDurationMs = silenceDurationMs,
+            speechDurationMs = speechDurationMs
+        )
 
+        val chunkSize = frameSize.value * 2
+        val pendingBytes = mutableListOf<Byte>()
+
+        audioRecord.startRecording()
         val recordingThread = Thread {
             val audioData = ByteArray(bufferSizeInBytes)
             while (isMicToggled) {
                 val bytesRead = audioRecord.read(audioData, 0, audioData.size)
                 if (bytesRead > 0) {
-                    Log.wtf("AudioRecord", audioData.asList().toString())
+//                    val audioDataList = audioData.asList().toString()
+//                    requireActivity().runOnUiThread {
+//                        textView?.append("${audioDataList}\n")
+//                    }
+//                    Log.d("AudioRecord", "${audioDataList.length.toString()} - ${audioDataList.toString()}")
+                    for (i in 0 until bytesRead) pendingBytes.add(audioData[i])
+                }
+                while (pendingBytes.size >= chunkSize) {
+                    val chunk = pendingBytes.subList(0, chunkSize).toByteArray()
+                    pendingBytes.subList(0, chunkSize).clear()
+
+                    val isSpeech = vad.isSpeech(chunk)
+                    Log.d("VAD", "Speech detected $isSpeech")
+
+                    requireActivity().runOnUiThread {
+                        val micIcon = view?.findViewById<ImageView>(R.id.micIcon)
+                        if (isSpeech) {
+                            micIcon?.setColorFilter(
+                                resources.getColor(R.color.active, null),
+                                android.graphics.PorterDuff.Mode.SRC_IN
+                            )
+                        } else {
+                            micIcon?.clearColorFilter()
+                            micIcon?.setImageResource(R.drawable.mic_24px)
+                        }
+                    }
+//                    val micIcon = view?.findViewById<ImageView>(R.id.micIcon)
+//                    if (isSpeech) {
+//                        micIcon?.setColorFilter(
+//                            resources.getColor(R.color.active, null),
+//                            android.graphics.PorterDuff.Mode.SRC_IN
+//                        )
+//                    } else {
+//                        micIcon?.setColorFilter(
+//                            resources.getColor(R.color.black, null),
+//                            android.graphics.PorterDuff.Mode.SRC_IN
+//                        )
+//                    }
                 }
             }
         }

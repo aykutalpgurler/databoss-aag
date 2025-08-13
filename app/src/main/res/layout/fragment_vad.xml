@@ -14,13 +14,13 @@
         android:clickable="true"
         android:contentDescription="Mic Icon"
         android:focusable="true"
-        android:src="@drawable/mic_24px"
+        android:src="@drawable/mic_off_24px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-<!--    <TextView-->
+    <!--    <TextView-->
 <!--        android:id="@+id/vadStatus"-->
 <!--        android:layout_width="wrap_content"-->
 <!--        android:layout_height="wrap_content"-->
