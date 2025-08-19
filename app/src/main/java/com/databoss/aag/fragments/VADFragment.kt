@@ -18,6 +18,11 @@ import com.konovalov.vad.webrtc.VadWebRTC
 import com.konovalov.vad.webrtc.config.FrameSize
 import com.konovalov.vad.webrtc.config.Mode
 import com.konovalov.vad.webrtc.config.SampleRate
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.StorageService
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 
@@ -29,9 +34,9 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
     // WebRTC VAD config
     private val sampleRate = SampleRate.SAMPLE_RATE_16K
     private val frameSize = FrameSize.FRAME_SIZE_320
-    private val mode = Mode.VERY_AGGRESSIVE
-    private val silenceDurationMs = 10
-    private val speechDurationMs = 100
+    private val mode = Mode.NORMAL
+    private val silenceDurationMs = 300
+    private val speechDurationMs = 50
 
     // AudioRecord config
     private val audioSource = android.media.MediaRecorder.AudioSource.MIC
@@ -47,10 +52,26 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
     private var vad: VadWebRTC? = null
     private var recordingThread: Thread? = null
 
+    // Vosk STT
+    private var model: Model? = null
+    private var recognizer: Recognizer? = null
+
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val micIcon = view.findViewById<ImageView>(R.id.micIcon)
+
+        // Load vosk model in a background thread
+        Thread {
+            try {
+//                model = Model("/Users/aykutalpgurler/AndroidStudioProjects/aag/app/src/main/assets/vosk-model-small-tr-0.3")
+//                recognizer = Recognizer(model, 16000.0f)
+                initVoskModel()
+                Log.i(TAG, "Vosk model loaded successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load vosk model", e)
+            }
+        }.start()
 
         micIcon.setOnClickListener {
             if (ActivityCompat.checkSelfPermission(
@@ -69,7 +90,6 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
             isMicToggled = !isMicToggled
 
             if (isMicToggled) {
-//                micIcon.setImageResource(R.drawable.mic_24px)
                 Log.d(TAG, "Listening started")
                 listenAudioRecord()
             } else {
@@ -101,6 +121,11 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         val pendingBytes = mutableListOf<Byte>()
         var allSpeechData = byteArrayOf()
         var allDataChunks = byteArrayOf()
+        val rawAudioData = ByteArrayOutputStream()
+
+//        if (model == null || recognizer == null) {
+//            initVoskModel()
+//        }
 
         audioRecord?.startRecording()
 
@@ -109,19 +134,15 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
             while (isMicToggled && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 val bytesRead = audioRecord?.read(audioData, 0, audioData.size) ?: 0
                 if (bytesRead > 0) {
+                    rawAudioData.write(audioData, 0, bytesRead)
                     for (i in 0 until bytesRead) pendingBytes.add(audioData[i])
                 }
-                Log.d("Pending Bytes", "${pendingBytes.size} - $pendingBytes")
                 while (pendingBytes.size >= chunkSize) {
                     val chunk = pendingBytes.subList(0, chunkSize).toByteArray()
                     allDataChunks += chunk
-//                    Log.d("Chunk", "${chunk.size} - ${chunk.asList()}")
                     pendingBytes.subList(0, chunkSize).clear()
 
                     val isSpeech = vad?.isSpeech(chunk) ?: false
-//                    Log.d("VAD", "Speech detected $isSpeech")
-                    Log.d("Chunk", "$isSpeech - ${chunk.asList()}")
-
                     requireActivity().runOnUiThread {
                         val micIcon = view?.findViewById<ImageView>(R.id.micIcon)
                         if (!isMicToggled) {
@@ -134,6 +155,21 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
                                 resources.getColor(R.color.active, null)
                             )
                             allSpeechData += chunk
+
+                            // Speech-to-Text
+                            recognizer?.let { rec ->
+                                val hasFinal = rec.acceptWaveForm(chunk, chunk.size)
+                                val text = if (hasFinal) {
+                                    JSONObject(rec.result).getString("text")
+                                } else {
+                                    JSONObject(rec.partialResult).optString("partial")
+                                }
+//                                Log.i(TAG, "Recognized: $text")
+                                if (text.isNotEmpty()) {
+                                    Log.i(TAG, "Recognized: $text")
+                                }
+                            }
+
                         } else {
                             micIcon?.clearColorFilter()
                             micIcon?.setImageResource(R.drawable.mic_24px)
@@ -141,12 +177,28 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
                     }
                 }
             }
-            save(audioData, "raw_data", "RTVAD")
+            save(rawAudioData.toByteArray(), "raw_data", "RTVAD")
             save(allSpeechData, "speech_chunks", "RTVAD")
             save(allDataChunks, "all_chunks", "RTVAD")
+
+//            // Speech-to-Text
+//            recognizer?.let { rec ->
+//                val hasFinal = rec.acceptWaveForm(allSpeechData, allSpeechData.size)
+//                val text = if (hasFinal) {
+//                    JSONObject(rec.result).getString("text")
+//                } else {
+//                    JSONObject(rec.partialResult).optString("partial")
+//                }
+//                Log.i(TAG, "Final Text: $text")
+////                                if (text.isNotEmpty()) {
+////                                    Log.i(TAG, "Recognized: $text")
+////                                }
+//            }
+
         }
 
         recordingThread?.start()
+//        rawAudioData.close()
     }
 
     private fun stopAudioRecord() {
@@ -155,11 +207,6 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         // Stop thread
         recordingThread?.join()
         recordingThread = null
-
-
-//        val micIcon = view?.findViewById<ImageView>(R.id.micIcon)
-//        micIcon?.clearColorFilter()
-//        micIcon?.setImageResource(R.drawable.mic_off_24px)
 
         // Stop and release AudioRecord
         audioRecord?.let {
@@ -178,15 +225,42 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         vad?.close()
         vad = null
 
-        Log.d(TAG, "AudioRecord and VAD released.")
+//        // Close Vosk
+//        recognizer?.close()
+//        recognizer = null
+//        model?.close()
+//        model = null
+
+        Log.d(TAG, "AudioRecord, VAD released.")
     }
 
-    override fun onStop() {
-        super.onStop()
+    override fun onPause() {
+        super.onPause()
         if (isMicToggled) {
             stopAudioRecord()
+            // Close Vosk
+            recognizer?.close()
+            recognizer = null
+            model?.close()
+            model = null
+            Log.d("FragmentPause", "Vosk released")
+
         }
     }
+
+//    override fun onStop() {
+//        super.onStop()
+//        if (isMicToggled) {
+//            stopAudioRecord()
+//            // Close Vosk
+//            recognizer?.close()
+//            recognizer = null
+//            model?.close()
+//            model = null
+//            Log.d("FragmentStop", "Vosk released")
+//
+//        }
+//    }
 
     private fun createWavHeader(
         totalAudioLen: Long,
@@ -196,10 +270,8 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
     ): ByteArray {
         val byteRate = sampleRate * channels * bitsPerSample / 8
         val totalDataLen = totalAudioLen + 36
-
         val header = ByteArray(44)
 
-        // RIFF/WAVE header
         header[0] = 'R'.code.toByte()
         header[1] = 'I'.code.toByte()
         header[2] = 'F'.code.toByte()
@@ -212,20 +284,13 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         header[9] = 'A'.code.toByte()
         header[10] = 'V'.code.toByte()
         header[11] = 'E'.code.toByte()
-
-        // fmt chunk
         header[12] = 'f'.code.toByte()
         header[13] = 'm'.code.toByte()
         header[14] = 't'.code.toByte()
         header[15] = ' '.code.toByte()
         header[16] = 16
-        header[17] = 0
-        header[18] = 0
-        header[19] = 0
         header[20] = 1
-        header[21] = 0
         header[22] = channels.toByte()
-        header[23] = 0
         header[24] = (sampleRate and 0xff).toByte()
         header[25] = ((sampleRate shr 8) and 0xff).toByte()
         header[26] = ((sampleRate shr 16) and 0xff).toByte()
@@ -238,9 +303,6 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         header[32] = (blockAlign.toInt() and 0xff).toByte()
         header[33] = ((blockAlign.toInt() shr 8) and 0xff).toByte()
         header[34] = bitsPerSample.toByte()
-        header[35] = 0
-
-        // data chunk
         header[36] = 'd'.code.toByte()
         header[37] = 'a'.code.toByte()
         header[38] = 't'.code.toByte()
@@ -249,12 +311,10 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
         header[41] = ((totalAudioLen.toInt() shr 8) and 0xff).toByte()
         header[42] = ((totalAudioLen.toInt() shr 16) and 0xff).toByte()
         header[43] = ((totalAudioLen.toInt() shr 24) and 0xff).toByte()
-
         return header
     }
 
     private fun save(data: ByteArray, fileName: String, dirName: String) {
-        // Save collected speech data
         val outputDir = File(requireContext().getExternalFilesDir(null), dirName)
         if (!outputDir.exists()) outputDir.mkdirs()
         val file = File(outputDir, "$fileName.wav")
@@ -269,5 +329,26 @@ class VADFragment : Fragment(R.layout.fragment_vad) {
             outputStream.write(data)
         }
     }
-}
 
+    // generated with Gemini 2.5 pro
+    private fun initVoskModel() {
+        Thread {
+            // StorageService.unpack() will copy the folder from your assets
+            // to the app's internal storage and return the absolute path to it.
+            StorageService.unpack(requireContext(), "vosk-model-small-tr-0.3", "model",
+                { model ->
+                    this.model = model
+                    this.recognizer = Recognizer(model, 16000.0f)
+                    Log.i(TAG, "Vosk model loaded successfully from internal storage.")
+
+                    // You can enable UI elements here if needed
+                    // requireActivity().runOnUiThread { micIcon.isEnabled = true }
+
+                },
+                { exception ->
+                    Log.e(TAG, "Failed to load vosk model", exception)
+                })
+        }.start()
+    }
+
+}

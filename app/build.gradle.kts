@@ -46,6 +46,8 @@ kotlin {
 
 dependencies {
 
+    implementation("net.java.dev.jna:jna:5.17.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.47")
     implementation("com.github.gkonovalov.android-vad:silero:2.0.10")
     implementation("com.github.gkonovalov.android-vad:webrtc:2.0.10")
     implementation(libs.androidx.core.ktx)
